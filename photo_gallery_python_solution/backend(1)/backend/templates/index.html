@@ -1,0 +1,256 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="" name="description">
+    <meta content="" name="author">
+
+
+    <title>IMAGE APP</title>
+    <link href="{% static 'bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+
+
+    <link href="{% static 'font-awesome/css/font-awesome.min.css' %}" rel="stylesheet">
+    <link href="{% static 'pe-icons/css/pe-icon-7-stroke.css' %}" rel="stylesheet">
+
+    <link href="{% static 'css/animate.css' %}" rel="stylesheet">
+    <link href="{% static 'style.css' %}" rel="stylesheet">
+
+</head>
+
+<body class="top-navigation pushy-right-side borderless">
+
+
+<!-- Site Overlay -->
+<div class="site-overlay"></div>
+
+<div id="master-wrapper">
+
+
+    <section id="our-courses" class="white-wrapper">
+        <div class="section-inner">
+            <div class="container">
+                <div class="row mb60 text-left">
+                    <div class="col-sm-12">
+                        <h3 class="section-title">PHOTO GALLERY</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div class="row">
+                    <div class="masonry-portfolio">
+                        <div class="col-sm-12 mb60">
+                            FILTERED BY DIMENSION
+                            <ul class=" masonry-portfolio-filter list-inline wow fadeIn text-left"
+                                data-wow-delay="0.2s">
+                                <li>
+                                    <button class="btn btn-primary btn-transparent active" id="0">
+                                        ALL
+                                    </button>
+                                </li>
+                                {% for d in dimensions %}
+                                    <li>
+                                        <button class="btn btn-primary btn-transparent"
+                                                id="{{ d }}"
+                                        >{{ d }}</button>
+                                    </li>
+                                {% endfor %}
+
+
+                            </ul>
+                        </div>
+                        <div class="col-sm-12">
+                            <div class="masonry-portfolio-items row">
+                                <div class="row" id="image-container">
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <div class="text-center">
+        <p id="loading" style="display: none">LOADING...</p>
+
+        <p>
+            <button id="load" class="btn btn-primary btn-transparent active" onclick="loadNextPage()">LOAD MORE</button>
+
+        </p>
+        <p id="noMore" style="display: none">NO MORE!</p>
+    </div>
+
+</div>
+
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<script src="{% static 'bootstrap/js/bootstrap.min.js' %}"></script>
+
+<script>
+    let current = 0;
+    let total = 0;
+
+    /*Request images using ajax*/
+    function request_images(params, clearOlder = false) {
+        let url = "http://127.0.0.1:8000/images/";
+        if (params) {
+            url = "http://127.0.0.1:8000/images/" + params;
+        }
+        $.ajax({
+            url: url,
+
+            success: function (res) {
+                let images = JSON.parse(res['images']);
+                current = res['current_page'];
+                total = res['total_page'];
+                if (parseInt(current) === parseInt(total)) {
+                    $('#load').hide();
+                    $('#noMore').show();
+                } else {
+                    $('#load').show();
+                    $('#noMore').hide();
+                }
+                if (clearOlder === true) {
+                    $('#image-container').empty();
+                    console.log('clear older')
+                }
+                for (let i in images) {
+                    $('#image-container').append(
+                        '<div class="col-sm-3 masonry-portfolio-item mb30 apps">' +
+                        '<div class="hover-effect smoothie">' +
+                        '' +
+                        '<img src="' + images[i] + '" alt="Image"' +
+                        'class="img-responsive smoothie">' +
+
+                        '<button class="btn btn-relative" style="display:none">GRAY</button>' +
+                        '</div>' +
+                        '</div>'
+                    )
+                }
+
+            },
+        });
+    }
+
+    $(function () {
+        request_images();
+        $("#image-container").on(
+            {
+                "mouseover": function () {
+                    $(this).children('button').show()
+                },
+                "mouseout": function () {
+                    $(this).children('button').hide()
+                },
+
+            }, ".hover-effect");
+        $("#image-container").on(
+            {
+
+                "click": function () {
+                    let img_src = $(this).siblings('img');
+
+                    let val = $(this).siblings('img').attr('src');
+                    let back_src = $(this).siblings('img').attr('back_src');
+                    /* if back_src  attr exists, we do not need to request api and just switch
+                        src and back_src
+                     */
+                    if (back_src) {
+                        let src = img_src.attr('src');
+                        img_src.attr('src', img_src.attr('back_src'));
+                        img_src.attr('back_src', src);
+                        /* change button status */
+                        if (back_src.indexOf("gray") >= 0) {
+                            $(this).addClass('active');
+
+                            $(this).text('ORIGIN');
+                        } else {
+                            $(this).removeClass('active');
+
+                            $(this).text('GRAY');
+                        }
+                        return;
+                    }
+                    /* request api to get grayscale image */
+                    if (val.indexOf("?grayscale") >= 0) {
+                        $(this).removeClass('active');
+                        $(this).text('GRAY');
+                        $(this).siblings('img').attr('src', val.replace('?grayscale', ''));
+                    } else {
+                        $(this).addClass('active');
+                        $(this).text('ORIGIN');
+                        let id = val.split('/id/')[1].split('/')[0];
+                        $.ajax({
+                            url: '/image/' + id + '/?grayscale',
+
+                            success: function (res) {
+                                console.log('set gray img');
+                                img_src.attr('back_src', img_src.attr('src'));
+
+                                img_src.attr('src', res);
+                            },
+                        });
+                    }
+                },
+            }, "button");
+
+
+        $("li button").click(function () {
+            let val = $(this).attr("id");
+            $(this).parent().siblings('li').children().removeClass('active');
+            $(this).addClass('active');
+            if (val === 0) {
+                request_images(None, true)
+            } else {
+                request_images('?dimension=' + val, true)
+
+            }
+        })
+    });
+
+    function loadNextPage() {
+
+        $('#loading').show();
+        $('#load').hide();
+        $.ajax({
+            url: "http://127.0.0.1:8000/images/?page=" + (parseInt(current) + 1),
+            async: true,
+            success: function (res) {
+                console.log(res);
+                let images = JSON.parse(res['images']);
+                current = res['current_page'];
+
+                total = res['total_page'];
+                for (let i in images) {
+                    $('#image-container').append(
+                        '<div class="col-sm-3 masonry-portfolio-item mb30 apps">' +
+                        '<div class="hover-effect smoothie">' +
+                        '' +
+                        '<img src="' + images[i] + '" alt="Image"' +
+                        'class="img-responsive smoothie">' +
+
+                        '<button class="btn btn-relative" style="display:none">GRAY</button>' +
+                        '</div>' +
+                        '</div>'
+                    )
+                }
+                $('#loading').hide();
+                $('#load').show();
+                if (parseInt(current) === parseInt(total)) {
+                    $('#load').hide();
+                    $('#noMore').show();
+                }
+            },
+        });
+
+    }
+
+
+</script>
+</body>
+</html>
